@@ -53,10 +53,6 @@ services:
     image: postgres:alpine
     env_file: ${ENV_FILE}
     working_dir: /app
-    environment:
-      - BASEDIR=/backups
-      - DBLIST=ergopad alpha hello
-      - DUMPPREFIX=prod
     volumes:
       - /backups/pgmaint:/backups
       - ./periodic/daily:/etc/periodic/daily/:ro
