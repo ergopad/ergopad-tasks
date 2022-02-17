@@ -1,3 +1,0 @@
-# ergopad-tasks
-celery, beat
-
