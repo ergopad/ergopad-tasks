@@ -4,7 +4,7 @@ import requests
 from celery import Celery
 from os import getenv
 from time import sleep, time
-from ergodex import cleanupHistoricalErgodex, getErgodexToken
+from ergodex import getErgodexToken
 
 POSTGRES_CONN = getenv('POSTGRES_CONN')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
