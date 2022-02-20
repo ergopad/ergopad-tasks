@@ -12,7 +12,7 @@ celery.conf.beat_schedule = {
     # vesting
     'vesting_1d': {
         'task': 'redeem_ergopad',
-        'schedule': crontab(hour=7), # daily at 7a UTC
+        'schedule': crontab(hour=7, minute=10), # daily at 7:10
         # 'options': {'queue' : 'omega'}, # default
     },
     # 'vesting1m': {'task': 'redeem_ergopad', 'schedule': crontab(minute='*/1')},
@@ -35,6 +35,17 @@ celery.conf.beat_schedule = {
     # cleanup 5m price tables
     'cleanup_scrape_1d': {
         'task': 'cleanup_continuous_5m',
-        'schedule': crontab(hour=6), # daily at 7a UTC
+        'schedule': crontab(hour=6, minute=5), # daily at 6:05
     },
+
+    'coinex_scrape_1m': {
+        'task': 'coinex_scrape_all',
+        'schedule': crontab(minute='*/1'), # every min
+    },
+
+    'coinex_cleanup_1d': {
+        'task': 'coinex_cleanup_all',
+        'schedule': crontab(hour=2, minute=25), # daily at 2:25
+    },
+
 }

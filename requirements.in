@@ -8,5 +8,4 @@ Jinja2
 requests
 uvicorn
 flower
-pandas
-sqlalchemy
+ccxt

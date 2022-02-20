@@ -5,6 +5,7 @@ from celery import Celery
 from os import getenv
 from time import sleep, time
 from ergodex import getErgodexToken
+from coinex import putLatestOHLCV, cleanupHistory
 
 POSTGRES_CONN = getenv('POSTGRES_CONN')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
@@ -134,3 +135,28 @@ def cleanup_continuous_5m(self):
         countdown = backoff(self.request.retries)
         logging.error(f'{myself()}: {e}; retry in {countdown}s')
 #endregion ROUTING
+
+@celery.task(name='coinex_scrape_all', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+def coinex_scrape_all(self):
+    try:
+        res = putLatestOHLCV()
+        return res
+
+    except Exception as e:
+        countdown = backoff(self.request.retries)
+        logging.error(f'{myself()}: {e}; retry in {countdown}s')
+        self.retry(countdown=countdown, exc=e)
+
+@celery.task(name='coinex_cleanup', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+def coinex_cleanup_all(self):
+    try:
+        res = cleanupHistory()
+        if res:
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        countdown = backoff(self.request.retries)
+        logging.error(f'{myself()}: {e}; retry in {countdown}s')
+        self.retry(countdown=countdown, exc=e)

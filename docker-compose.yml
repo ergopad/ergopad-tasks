@@ -20,7 +20,7 @@ services:
         options:
             max-file: 5
             max-size: 10m
-    command: celery -A tasks.celery worker -l ${CELERY_LOGLEVEL} -c 2 -n worker@ergopad -Q ${CELERY_QUEUE} # -f logs/celery.log #--without-heartbeat --without-gossip --without-mingle
+    command: celery -A tasks.celery worker -l ${CELERY_LOGLEVEL} -c 2 -n worker@${WORKER_NAME} -Q ${CELERY_QUEUE} # -f logs/celery.log #--without-heartbeat --without-gossip --without-mingle
     networks:
       - ergopad-data_net
       - ergopad-node_net
