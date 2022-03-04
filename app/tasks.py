@@ -11,6 +11,7 @@ from coinex import putLatestOHLCV, cleanupHistory
 # http://www.ines-panker.com/2020/10/28/celery-explained.html
 
 ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
+API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
@@ -59,11 +60,13 @@ def alertAdmin(subject, body):
     try:
         payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
         res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
-        return res.text
+        try: return res.json()
+        except: return res.text()
 
     except:
         pass
-        return 'failed to send email'    
+        
+    return {'status': 'emailed', 'message': 'failed to send email'}
 
 # proactive notify on err
 # req auth endpoint
@@ -73,27 +76,41 @@ def emit_staking(self):
         res = requests.post(f'{API_URL}/staking/emit', headers=headers, json=stakingBody, verify=False)        
         if res.ok:
             return res.json()
+        elif 'Too early for a new emission' in res.text:
+            return {'status': 'completed', 'message': 'too early'}
         else:
-            raise TaskFailure(f'{res.text}')
+           raise TaskFailure(f'{res.text}')
 
     except Exception as e:
         logging.error(f'{myself()}: {e}')
         alertAdmin(f'FAIL: {myself()}', f'staking.emit\nerr: {e}')
         self.retry(exc=e)
 
-@celery.task(name='compound_staking', bind=True, default_retry_delay=300, max_retries=5, retry_backoff=True)
+@celery.task(name='compound_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def compound_staking(self):
     try:        
         ## !! NOTE: if we don't wait, this call will spam mempool
+        i = 0
+        while i <= 5:
+            logging.debug(f'attempt: {i}')
+            # call compound        
+            res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
+            if res.ok:
+                try:
+                    logging.debug(f'staking/compound: {res.status_code}')
+                    remainingStakers = int(res.json()['remainingStakers'])
+                    logging.debug(f'remainingStakers: {remainingStakers}')
+                    if remainingStakers == 0:
+                        return res.json()
+                except:
+                    pass
+            else:
+                raise TaskFailure(f'{res.text}')
+            
+            sleep(10) # wait 10 seconds
+            i += 1
 
-        # call compound        
-        res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
-        if res.ok:
-            return res.json()
-        else:
-            raise TaskFailure(f'{res.text}')
-        
-        sleep(10) # wait 10 seconds
+        alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
 
     except Exception as e:
         logging.error(f'{myself()}: {e}')
