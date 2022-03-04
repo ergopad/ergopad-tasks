@@ -58,7 +58,7 @@ def redeem_ergopad(self):
 def alertAdmin(subject, body):
     try:
         payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
-        res = requests.post('http://api:8000/api/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
+        res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
         return res.text
 
     except:
@@ -70,7 +70,7 @@ def alertAdmin(subject, body):
 @celery.task(name='emit_staking', bind=True, default_retry_delay=180, max_retries=20)
 def emit_staking(self):
     try:
-        res = requests.post('http://api:8000/api/staking/emit', headers=headers, json=stakingBody, verify=False)        
+        res = requests.post(f'{API_URL}/staking/emit', headers=headers, json=stakingBody, verify=False)        
         if res.ok:
             return res.json()
         else:
