@@ -14,7 +14,9 @@ RUN apt-get update \
   && apt-get clean
 
 # install python dependencies
-RUN pip install --upgrade pip
+RUN python -m pip install --upgrade pip
 RUN pip install -r requirements.txt
+# WTF: this works just fine outside of rquirements.txt
+RUN pip install discord
 
 CMD tail /dev/null -f

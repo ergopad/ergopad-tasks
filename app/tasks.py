@@ -1,5 +1,6 @@
 import psycopg
 import requests 
+from discord import Webhook, RequestsWebhookAdapter
 
 from celery import Celery
 from os import getenv
@@ -7,9 +8,17 @@ from time import sleep, time
 from ergodex import getErgodexToken
 from coinex import putLatestOHLCV, cleanupHistory
 
+# http://www.ines-panker.com/2020/10/29/retry-celery-tasks.html
+# http://www.ines-panker.com/2020/10/28/celery-explained.html
+
+ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
+API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
+ERGOPAD_DISCORD_WEBHOOK = getenv('ERGOPAD_DISCORD_WEBHOOK')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
+headers = {'Content-Type': 'application/json'}
+stakingBody = {'apiKey': getenv('API_KEY'), 'numBoxes': 50}
 
 DEBUG = True
 
@@ -30,15 +39,12 @@ class TaskFailure(Exception):
    pass
 
 #region ROUTING
-def backoff(attempts):
-    return 2**attempts
-
 @celery.task(name="create_task")
 def create_task(task_type):
     sleep(int(task_type) * 10)
     return True 
 
-@celery.task(name='redeem_ergopad', bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='redeem_ergopad', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def redeem_ergopad(self):
     try:
         res = requests.get('https://ergopad.io/api/vesting/redeem/Y2JDKcXN5zrz3NxpJqhGcJzgPRqQcmMhLqsX3TkkqMxQKK86Sh3hAZUuUweRZ97SLuCYLiB2duoEpYY2Zim3j5aJrDQcsvwyLG2ixLLzgMaWfBhTqxSbv1VgQQkVMKrA4Cx6AiyWJdeXSJA6UMmkGcxNCANbCw7dmrDS6KbnraTAJh6Qj6s9r56pWMeTXKWFxDQSnmB4oZ1o1y6eqyPgamRsoNuEjFBJtkTWKqYoF8FsvquvbzssZMpF6FhA1fkiH3n8oKpxARWRLjx2QwsL6W5hyydZ8VFK3SqYswFvRnCme5Ywi4GvhHeeukW4w1mhVx6sbAaJihWLHvsybRXLWToUXcqXfqYAGyVRJzD1rCeNa8kUb7KHRbzgynHCZR68Khi3G7urSunB9RPTp1EduL264YV5pmRLtoNnH9mf2hAkkmqwydi9LoULxrwsRvp', verify=False)
@@ -49,20 +55,83 @@ def redeem_ergopad(self):
             # return {'status': 'failed', 'message': res.text}
 
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(bind=True, default_retry_delay=300, max_retries=5)
+def alertAdmin(subject, body):
+    try:
+        webhook = Webhook.from_url(ERGOPAD_DISCORD_WEBHOOK, adapter=RequestsWebhookAdapter())       
+        webhook.send(content=f':bangbang:CELERY:bangbang:\nsubject: `{subject}`\nbody: `{body}`')
+
+        payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
+        res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
+
+        try: return res.json()
+        except: return res.content
+
+    except:
+        pass
+        
+    return {'status': 'emailed', 'message': 'failed to send email'}
+
+# proactive notify on err
+# req auth endpoint
+@celery.task(name='emit_staking', bind=True, default_retry_delay=180, max_retries=20)
+def emit_staking(self):
+    try:
+        res = requests.post(f'{API_URL}/staking/emit', headers=headers, json=stakingBody, verify=False)        
+        if res.ok:
+            return res.json()
+        elif 'Too early for a new emission' in res.text:
+            return {'status': 'completed', 'message': 'too early'}
+        else:
+           raise TaskFailure(f'{res.text}')
+
+    except Exception as e:
+        logging.error(f'{myself()}: {e}')
+        alertAdmin(f'FAIL: {myself()}', f'staking.emit\nerr: {e}')
+        self.retry(exc=e)
+
+@celery.task(name='compound_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
+def compound_staking(self):
+    try:        
+        ## !! NOTE: if we don't wait, this call will spam mempool
+        i = 0
+        while i <= 5:
+            logging.debug(f'attempt: {i}')
+            # call compound        
+            res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
+            if res.ok:
+                try:
+                    logging.debug(f'staking/compound: {res.status_code}')
+                    remainingStakers = int(res.json()['remainingStakers'])
+                    logging.debug(f'remainingStakers: {remainingStakers}')
+                    if remainingStakers == 0:
+                        return res.json()
+                except:
+                    pass
+            else:
+                raise TaskFailure(f'{res.text}')
+            
+            sleep(10) # wait 10 seconds
+            i += 1
+
+        alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
+
+    except Exception as e:
+        logging.error(f'{myself()}: {e}')
+        alertAdmin(f'FAIL: {myself()}', f'staking.compound\nerr: {e}')
+        self.retry(exc=e)
+
+@celery.task(bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def hello(self, word: str) -> str:
     try:
         return {"Hello": word}
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(name='scrape_price_data', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='scrape_price_data', acks_late=True, bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def scrape_price_data(self):
     try:
         res = requests.get(ergo_watch_api).json()
@@ -93,11 +162,10 @@ def scrape_price_data(self):
             return {'status': 'failed', 'message': res.text}
 
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(name='scrape_price_ergodex', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='scrape_price_ergodex', acks_late=True, bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def scrape_price_ergodex(self):
     try:
         res = getErgodexToken()
@@ -115,11 +183,10 @@ def scrape_price_ergodex(self):
             return {'status': 'failed', 'message': res.text}
             
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(name='cleanup_continuous_5m', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='cleanup_continuous_5m', acks_late=True, bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def cleanup_continuous_5m(self):
     try:
         with psycopg.connect(POSTGRES_CONN) as con:
@@ -132,22 +199,20 @@ def cleanup_continuous_5m(self):
             return {'status': 'success', 'sql': f'{sql1}\n{sql2}', 'message (timestamp_utc)': f'{dlt1}\n{dlt2}'}
             
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-#endregion ROUTING
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(name='coinex_scrape_all', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='coinex_scrape_all', acks_late=True, bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def coinex_scrape_all(self):
     try:
         res = putLatestOHLCV()
         return res
 
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
 
-@celery.task(name='coinex_cleanup', acks_late=True, bind=True, default_retry_delay=300, max_retries=5)
+@celery.task(name='coinex_cleanup', acks_late=True, bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def coinex_cleanup_all(self):
     try:
         res = cleanupHistory()
@@ -157,6 +222,6 @@ def coinex_cleanup_all(self):
             return False
 
     except Exception as e:
-        countdown = backoff(self.request.retries)
-        logging.error(f'{myself()}: {e}; retry in {countdown}s')
-        self.retry(countdown=countdown, exc=e)
+        logging.error(f'{myself()}: {e}')
+        self.retry(exc=e)
+#endregion ROUTING
