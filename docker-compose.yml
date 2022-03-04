@@ -94,3 +94,5 @@ networks:
     external: true
   ergopad-node_net:
     external: true
+  ergopad-api_net:
+    external: true

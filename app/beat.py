@@ -48,4 +48,16 @@ celery.conf.beat_schedule = {
         'schedule': crontab(hour=2, minute=25), # daily at 2:25
     },
 
+    # staking emmission daily
+    'emit_staking_1d': {
+        'task': 'emit_staking',
+        'schedule': crontab(hour=1, minute=45),
+    },
+
+    # staking compound hourly
+    'compound_staking_1h': {
+        'task': 'compound_staking',
+        'schedule': crontab(minute=15),
+    },
+
 }
