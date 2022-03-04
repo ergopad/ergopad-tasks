@@ -14,7 +14,7 @@ from coinex import putLatestOHLCV, cleanupHistory
 ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
 API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
-ERGOPAD_DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/949278330631356446/yGcmqU_mUEvIaMApHFBURC-1WGMAbBhCWEb0KpOASSRgf0zn7FCSl8uHcEW7KRZHF-Sz'
+ERGOPAD_DISCORD_WEBHOOK = getenv('ERGOPAD_DISCORD_WEBHOOK')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
 headers = {'Content-Type': 'application/json'}
