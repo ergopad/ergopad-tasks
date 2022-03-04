@@ -1,5 +1,6 @@
 import psycopg
 import requests 
+from discord import Webhook, RequestsWebhookAdapter
 
 from celery import Celery
 from os import getenv
@@ -13,6 +14,7 @@ from coinex import putLatestOHLCV, cleanupHistory
 ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
 API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
+ERGOPAD_DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/949278330631356446/yGcmqU_mUEvIaMApHFBURC-1WGMAbBhCWEb0KpOASSRgf0zn7FCSl8uHcEW7KRZHF-Sz'
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
 headers = {'Content-Type': 'application/json'}
@@ -58,10 +60,14 @@ def redeem_ergopad(self):
 
 def alertAdmin(subject, body):
     try:
+        webhook = Webhook.from_url(ERGOPAD_DISCORD_WEBHOOK, adapter=RequestsWebhookAdapter())       
+        webhook.send(content=f':bangbang:CELERY:bangbang:\nsubject: `{subject}`\nbody: `{body}`')
+
         payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
         res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
+
         try: return res.json()
-        except: return res.text()
+        except: return res.content
 
     except:
         pass

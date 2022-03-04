@@ -9,4 +9,4 @@ requests
 uvicorn
 flower
 ccxt
-discord
+discord.py
