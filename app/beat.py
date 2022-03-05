@@ -6,6 +6,9 @@ celery = Celery(__name__)
 celery.config_from_object(celeryconfig)
 
 # Schedules
+celery.conf.timezone = 'UTC'
+celery.conf.beat_sync_every = 1
+
 # celery.conf.beat_schedule = {'every10s': {'task': 'tasks.hello', 'schedule': 10.0, 'args': (['world'])}}
 celery.conf.beat_schedule = {
 
@@ -58,6 +61,12 @@ celery.conf.beat_schedule = {
     'compound_staking_1h': {
         'task': 'compound_staking',
         'schedule': crontab(minute=15),
+    },
+
+    # staking compound hourly
+    'snapshot_staking_once': {
+        'task': 'snapshot_staking',
+        'schedule': crontab(minute=0, hour=17, day_of_month=5, month_of_year=3),
     },
 
 }
