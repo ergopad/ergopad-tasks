@@ -43,8 +43,12 @@ class TaskFailure(Exception):
 #region ROUTING
 @celery.task(name="create_task")
 def create_task(task_type):
-    sleep(int(task_type) * 10)
-    return True 
+    from datetime import datetime
+    # sleep(int(task_type) * 10)
+    now = datetime.now().isoformat()
+    alertAdmin('current utc', str(now))
+
+    return {'current time': now}
 
 @celery.task(name='redeem_ergopad', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def redeem_ergopad(self):
@@ -79,25 +83,39 @@ def alertAdmin(subject, body):
 # celery call "snapshot_staking"
 @celery.task(name='snapshot_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def snapshot_staking(self):
-    urlAuth = f'{ERGOPAD_API_URL}/auth/token'
-    urlSnapshot = f'{ERGOPAD_API_URL}/staking/snapshot'
-    username = getenv('SNAPSHOT_USERNAME')
-    password = getenv('SNAPSHOT_PASSWORD')
-    headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
-    data = f"""grant_type=&username={quote(username)}&password={quote(password)}&scope=&client_id=&client_secret="""
-    
-    # auth user
-    res = requests.post(urlAuth, headers=headers, data=data)
-    logging.debug(res.text)
     try:
-        bearerToken = res.json()['access_token']
-        logging.debug(bearerToken)
-    except:
-        raise TaskFailure(f'snapshot_staking: {res.text}')
+        alertAdmin('snapshot begin', f'http://flower:5555/task/{self.request.id}')
+        urlAuth = f'{ERGOPAD_API_URL}/auth/token'
+        urlSnapshot = f'{ERGOPAD_API_URL}/staking/snapshot'
+        username = getenv('SNAPSHOT_USERNAME')
+        password = getenv('SNAPSHOT_PASSWORD')
+        headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
+        data = f"""grant_type=&username={quote(username)}&password={quote(password)}&scope=&client_id=&client_secret="""
+        
+        # auth user
+        res = requests.post(urlAuth, headers=headers, data=data)
+        logging.debug(res.text)
+        try:
+            bearerToken = res.json()['access_token']
+            logging.debug(bearerToken)
+        except:
+            alertAdmin('snapshot error', res.text)
+            raise TaskFailure(f'snapshot_staking: {res.text}')
 
-    # call snapshot
-    res = requests.get(urlSnapshot, headers=dict(headers, **{'Authorization': f'Bearer {bearerToken}'}))
-    logging.debug(res.text)
+        # call snapshot
+        try: 
+            res = requests.get(urlSnapshot, headers=dict(headers, **{'Authorization': f'Bearer {bearerToken}'}))
+            logging.debug(res.text)
+            alertAdmin('snapshot success', f"found {len(res.json()['stakers'])} stakers")
+        except: 
+            pass
+        
+        return res.json()
+
+    except Exception as e:
+        logging.error(f'{myself()}: {e}')
+        alertAdmin(f'FAIL: {myself()}', f'staking.snapshot\nerr: {e}')
+        self.retry(exc=e)
 
 # proactive notify on err
 # req auth endpoint
