@@ -24,9 +24,9 @@ task_serializer = 'json'
 result_serializer = 'json'
 accept_content = ['application/json', 'json', 'yaml']
 timezone = 'UTC'
-worker_send_task_event = False
-task_time_limit = 300 # task will be killed after 5 mins
-task_soft_time_limit = 180 # task will raise exception SoftTimeLimitExceeded after 3 mins
+worker_send_task_event = True
+task_time_limit = 1200 # task will be killed after 20 mins
+task_soft_time_limit = 600 # task will raise exception SoftTimeLimitExceeded after 10 mins
 task_acks_late = True # task messages will be acknowledged after the task has been executed, not just before (the default behavior).
 worker_prefetch_multiplier = 10 # One worker taks 10 tasks from queue at a time and will increase the performance
 
@@ -46,15 +46,15 @@ task_default_priority = 5
 #     Queue('omega_tasks', routing_key='omega.#', queue_arguments={'x-max-priority': 1}),
 # )
 # https://docs.celeryproject.org/en/stable/userguide/routing.html
-task_routes = {
-    'alpha.*': {
-        'queue': 'alpha_tasks',
-        'routing_key': 'alpha',
-    },
-    'omega.*': {
-        'queue': 'omega_tasks',
-        'routing_key': 'omega',
-    },
-}
+# task_routes = {
+#    'alpha.*': {
+#        'queue': 'alpha_tasks',
+#        'routing_key': 'alpha',
+#    },
+#    'omega.*': {
+#        'queue': 'omega_tasks',
+#        'routing_key': 'omega',
+#    },
+#}
 # task_default_exchange_type = 'default'
 task_default_exchange_type = 'direct'
