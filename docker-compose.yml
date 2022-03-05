@@ -3,7 +3,7 @@ version: '3.9'
 services:
   celery:
     container_name: celery
-    env_file: app/.env
+    env_file: ${ENV_FILE}
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,14 +20,14 @@ services:
         options:
             max-file: 5
             max-size: 10m
-    command: celery -A tasks.celery worker -l ${CELERY_LOGLEVEL} -c 2 -n worker@ergopad -Q ${CELERY_QUEUE} # -f logs/celery.log #--without-heartbeat --without-gossip --without-mingle
+    command: celery -A tasks.celery worker -l ${CELERY_LOGLEVEL} -c 2 -n worker@${WORKER_NAME} -Q ${CELERY_QUEUE} # -f logs/celery.log #--without-heartbeat --without-gossip --without-mingle
     networks:
       - ergopad-data_net
       - ergopad-node_net
 
   celerybeat:
     container_name: celerybeat
-    env_file: app/.env
+    env_file: ${ENV_FILE}
     build:
       context: .
       dockerfile: Dockerfile
@@ -51,12 +51,8 @@ services:
   pgmaint:
     container_name: pgmaint
     image: postgres:alpine
-    env_file: app/.env
+    env_file: ${ENV_FILE}
     working_dir: /app
-    environment:
-      - BASEDIR=/backups
-      - DBLIST=ergopad alpha hello
-      - DUMPPREFIX=prod
     volumes:
       - /backups/pgmaint:/backups
       - ./periodic/daily:/etc/periodic/daily/:ro
@@ -71,13 +67,15 @@ services:
         options:
             max-file: 5
             max-size: 10m
+    profiles: 
+      - beta
     command: tail /dev/null -f
     networks:
       - ergopad-data_net
 
   celeryui:
     container_name: celeryui
-    env_file: app/.env
+    env_file: ${ENV_FILE}
     build:
       context: .
       dockerfile: Dockerfile
@@ -95,4 +93,6 @@ networks:
   ergopad-data_net:
     external: true
   ergopad-node_net:
+    external: true
+  ergopad-api_net:
     external: true
