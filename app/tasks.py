@@ -1,7 +1,8 @@
 import psycopg
 import requests 
-from discord import Webhook, RequestsWebhookAdapter
 
+from discord import Webhook, RequestsWebhookAdapter
+from urllib.parse import quote # urlencode
 from celery import Celery
 from os import getenv
 from time import sleep, time
@@ -15,6 +16,7 @@ ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
 API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
 ERGOPAD_DISCORD_WEBHOOK = getenv('ERGOPAD_DISCORD_WEBHOOK')
+ERGOPAD_API_URL = getenv('ERGOPAD_API_URL')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
 headers = {'Content-Type': 'application/json'}
@@ -73,6 +75,29 @@ def alertAdmin(subject, body):
         pass
         
     return {'status': 'emailed', 'message': 'failed to send email'}
+
+# celery call "snapshot_staking"
+@celery.task(name='snapshot_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
+def snapshot_staking(self):
+    urlAuth = f'{ERGOPAD_API_URL}/auth/token'
+    urlSnapshot = f'{ERGOPAD_API_URL}/staking/snapshot'
+    username = getenv('SNAPSHOT_USERNAME')
+    password = getenv('SNAPSHOT_PASSWORD')
+    headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
+    data = f"""grant_type=&username={quote(username)}&password={quote(password)}&scope=&client_id=&client_secret="""
+    
+    # auth user
+    res = requests.post(urlAuth, headers=headers, data=data)
+    logging.debug(res.text)
+    try:
+        bearerToken = res.json()['access_token']
+        logging.debug(bearerToken)
+    except:
+        raise TaskFailure(f'snapshot_staking: {res.text}')
+
+    # call snapshot
+    res = requests.get(urlSnapshot, headers=dict(headers, **{'Authorization': f'Bearer {bearerToken}'}))
+    logging.debug(res.text)
 
 # proactive notify on err
 # req auth endpoint
