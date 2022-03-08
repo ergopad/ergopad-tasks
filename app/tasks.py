@@ -119,6 +119,7 @@ def snapshot_staking(self):
 
 # proactive notify on err
 # req auth endpoint
+# !! call top of hour; follow with compound call 15 mins later
 @celery.task(name='emit_staking', bind=True, default_retry_delay=180, max_retries=20)
 def emit_staking(self):
     try:
@@ -142,7 +143,7 @@ def compound_staking(self):
         i = 0
         while i <= 5:
             logging.debug(f'attempt: {i}')
-            # call compound        
+            # call compound
             res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
             if res.ok:
                 try:
@@ -156,7 +157,7 @@ def compound_staking(self):
             else:
                 raise TaskFailure(f'{res.text}')
             
-            sleep(10) # wait 10 seconds
+            sleep(300) # 5 mins
             i += 1
 
         alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
