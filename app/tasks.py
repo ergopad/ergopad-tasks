@@ -20,7 +20,7 @@ ERGOPAD_API_URL = getenv('ERGOPAD_API_URL')
 ergo_watch_api: str = f'https://ergo.watch/api/sigmausd/state'
 nerg2erg = 10**9
 headers = {'Content-Type': 'application/json'}
-stakingBody = {'apiKey': getenv('API_KEY'), 'numBoxes': 50}
+stakingBody = {'apiKey': getenv('ERGOPAD_APIKEY'), 'numBoxes': 50}
 
 DEBUG = True
 

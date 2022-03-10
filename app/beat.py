@@ -12,10 +12,22 @@ celery.conf.beat_sync_every = 1
 # celery.conf.beat_schedule = {'every10s': {'task': 'tasks.hello', 'schedule': 10.0, 'args': (['world'])}}
 celery.conf.beat_schedule = {
 
+    # staking emmission daily
+    'emit_staking_1h': {
+        'task': 'emit_staking',
+        'schedule': crontab(minute='0'),
+    },
+
+    # staking compound hourly
+    'compound_staking_1h': {
+        'task': 'compound_staking',
+        'schedule': crontab(minute='15'),
+    },
+
     # vesting
     'vesting_1d': {
         'task': 'redeem_ergopad',
-        'schedule': crontab(hour=7, minute=10), # daily at 7:10
+        'schedule': crontab(hour='7', minute='10'), # daily at 7:10
         # 'options': {'queue' : 'omega'}, # default
     },
     # 'vesting1m': {'task': 'redeem_ergopad', 'schedule': crontab(minute='*/1')},
@@ -38,7 +50,7 @@ celery.conf.beat_schedule = {
     # cleanup 5m price tables
     'cleanup_scrape_1d': {
         'task': 'cleanup_continuous_5m',
-        'schedule': crontab(hour=6, minute=5), # daily at 6:05
+        'schedule': crontab(hour='6', minute='5'), # daily at 6:05
     },
 
     'coinex_scrape_1m': {
@@ -48,25 +60,13 @@ celery.conf.beat_schedule = {
 
     'coinex_cleanup_1d': {
         'task': 'coinex_cleanup_all',
-        'schedule': crontab(hour=2, minute=25), # daily at 2:25
-    },
-
-    # staking emmission daily
-    'emit_staking_1d': {
-        'task': 'emit_staking',
-        'schedule': crontab(hour=1, minute=45),
-    },
-
-    # staking compound hourly
-    'compound_staking_1h': {
-        'task': 'compound_staking',
-        'schedule': crontab(minute=15),
+        'schedule': crontab(hour='2', minute='25'), # daily at 2:25
     },
 
     # staking compound hourly
     'snapshot_staking_once': {
         'task': 'snapshot_staking',
-        'schedule': crontab(minute=0, hour=17, day_of_month=5, month_of_year=3),
+        'schedule': crontab(minute='0', hour='17', day_of_month='5', month_of_year='3'),
     },
 
 }
