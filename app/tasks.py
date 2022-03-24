@@ -12,7 +12,7 @@ from coinex import putLatestOHLCV, cleanupHistory
 # http://www.ines-panker.com/2020/10/29/retry-celery-tasks.html
 # http://www.ines-panker.com/2020/10/28/celery-explained.html
 
-ADMIN_EMAIL = 'leif@ergopad.io' # TODO: move this to config
+# ADMIN_EMAIL = '' # TODO: move this to config
 API_URL = getenv('API_URL')
 POSTGRES_CONN = getenv('POSTGRES_CONN')
 ERGOPAD_DISCORD_WEBHOOK = getenv('ERGOPAD_DISCORD_WEBHOOK')
@@ -69,8 +69,8 @@ def alertAdmin(subject, body):
         webhook = Webhook.from_url(ERGOPAD_DISCORD_WEBHOOK, adapter=RequestsWebhookAdapter())       
         webhook.send(content=f':bangbang:CELERY:bangbang:\nsubject: `{subject}`\nbody: `{body}`')
 
-        payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
-        res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
+        # payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
+        # res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
 
         try: return res.json()
         except: return res.content
