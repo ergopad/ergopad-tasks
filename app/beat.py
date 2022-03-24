@@ -24,6 +24,12 @@ celery.conf.beat_schedule = {
         'schedule': crontab(minute='15'),
     },
 
+    # staking snapshot (backup)
+    #'snapshot_staking_once': { 
+    #    'task': 'snapshot_staking',
+    #    'schedule': crontab(minute='0', hour='17', day_of_month='5', month_of_year='3'),
+    #},
+
     # vesting
     'vesting_1d': {
         'task': 'redeem_ergopad',
@@ -61,12 +67,6 @@ celery.conf.beat_schedule = {
     'coinex_cleanup_1d': {
         'task': 'coinex_cleanup_all',
         'schedule': crontab(hour='2', minute='25'), # daily at 2:25
-    },
-
-    # staking compound hourly
-    'snapshot_staking_once': {
-        'task': 'snapshot_staking',
-        'schedule': crontab(minute='0', hour='17', day_of_month='5', month_of_year='3'),
     },
 
 }

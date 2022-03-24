@@ -25,8 +25,8 @@ result_serializer = 'json'
 accept_content = ['application/json', 'json', 'yaml']
 timezone = 'UTC'
 worker_send_task_event = True
-task_time_limit = 1200 # task will be killed after 20 mins
-task_soft_time_limit = 600 # task will raise exception SoftTimeLimitExceeded after 10 mins
+task_time_limit = 2400 # task will be killed after 20 mins
+task_soft_time_limit = 1800 # task will raise exception SoftTimeLimitExceeded after 10 mins
 task_acks_late = True # task messages will be acknowledged after the task has been executed, not just before (the default behavior).
 worker_prefetch_multiplier = 10 # One worker taks 10 tasks from queue at a time and will increase the performance
 
