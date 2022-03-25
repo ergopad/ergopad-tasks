@@ -138,29 +138,29 @@ def emit_staking(self):
 
 @celery.task(name='compound_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
 def compound_staking(self):
-    try:        
-        ## !! NOTE: if we don't wait, this call will spam mempool
+    try:      
+        remainingBoxes = 1
         i = 0
-        while i <= 5:
-            logging.debug(f'attempt: {i}')
-            # call compound
+        while remainingBoxes > 0 or (i >= 5):
             res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
             if res.ok:
-                try:
-                    logging.debug(f'staking/compound: {res.status_code}')
-                    remainingStakers = int(res.json()['remainingStakers'])
-                    logging.debug(f'remainingStakers: {remainingStakers}')
-                    if remainingStakers == 0:
-                        return res.json()
-                except:
-                    pass
+                if res.json():
+                    try:
+                        remainingBoxes = int(res.json()['remainingBoxes'])
+                        compoundTx = res.json()['compoundTx']
+                        logging.debug(f'compoundTx: {compoundTx}')
+                    except:
+                        return {'res': res.text}
+            elif 'Too early for a new emission' in res.text:
+                return {'status': 'complete', 'message': 'too early'}
             else:
-                raise TaskFailure(f'{res.text}')
-            
-            sleep(300) # 5 mins
+                alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
+                raise TaskFailure(res.text)
             i += 1
 
-        alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
+        try: msg = res.json() 
+        except: msg = res.text
+        return {'status': 'complete', 'msg': msg}
 
     except Exception as e:
         logging.error(f'{myself()}: {e}')
