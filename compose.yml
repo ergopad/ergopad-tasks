@@ -9,6 +9,10 @@ services:
       dockerfile: Dockerfile
     volumes: 
       - ./app:/app
+    networks:
+      - ergopad-data_net
+      - ergopad-node_net
+      - ergopad-net
     deploy:
       restart_policy:
         condition: on-failure
@@ -20,10 +24,8 @@ services:
         options:
             max-file: 5
             max-size: 10m
+    # command: tail /dev/null -f
     command: celery -A tasks.celery worker -l ${CELERY_LOGLEVEL} -c 2 -n worker@${WORKER_NAME} -Q ${CELERY_QUEUE} -E # -f logs/celery.log #--without-heartbeat --without-gossip --without-mingle
-    networks:
-      - ergopad-data_net
-      - ergopad-node_net
 
   celerybeat:
     container_name: celerybeat
@@ -33,6 +35,9 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./app:/app
+    networks: 
+      - ergopad-data_net
+      - ergopad-net
     deploy:
       restart_policy:
         condition: on-failure
@@ -45,8 +50,6 @@ services:
             max-file: 5
             max-size: 10m
     command: celery -A beat.celery beat -l ${CELERY_LOGLEVEL} # -f logs/celerybeat.log
-    networks:
-      - ergopad-data_net
 
   pgmaint:
     container_name: pgmaint
@@ -56,6 +59,9 @@ services:
     volumes:
       - /backups/pgmaint:/backups
       - ./periodic/daily:/etc/periodic/daily/:ro
+    networks: 
+      - ergopad-data_net
+      - ergopad-net
     deploy:
       restart_policy:
         condition: on-failure
@@ -70,8 +76,6 @@ services:
     profiles: 
       - beta
     command: tail /dev/null -f
-    networks:
-      - ergopad-data_net
 
   celeryui:
     container_name: celeryui
@@ -83,11 +87,12 @@ services:
       - 8004:8000
     volumes: 
       - ./app:/app
+    networks: 
+      - ergopad-data_net
+      - ergopad-net
     profiles: 
       - disabled
     command: uvicorn main:app --host 0.0.0.0 --reload
-    networks:
-      - ergopad-data_net
 
 networks:
   ergopad-data_net:
@@ -95,4 +100,6 @@ networks:
   ergopad-node_net:
     external: true
   ergopad-api_net:
+    external: true
+  ergopad-net:
     external: true

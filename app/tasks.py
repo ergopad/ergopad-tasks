@@ -8,6 +8,7 @@ from os import getenv
 from time import sleep, time
 from ergodex import getErgodexToken
 from coinex import putLatestOHLCV, cleanupHistory
+from validator import height
 
 # http://www.ines-panker.com/2020/10/29/retry-celery-tasks.html
 # http://www.ines-panker.com/2020/10/28/celery-explained.html
@@ -65,20 +66,26 @@ def redeem_ergopad(self):
         self.retry(exc=e)
 
 def alertAdmin(subject, body):
+    return {} 
+    
     try:
         webhook = Webhook.from_url(ERGOPAD_DISCORD_WEBHOOK, adapter=RequestsWebhookAdapter())       
         webhook.send(content=f':bangbang:CELERY:bangbang:\nsubject: `{subject}`\nbody: `{body}`')
 
-        # payload = {'to': ADMIN_EMAIL, 'subject': subject, 'body': body}
-        # res = requests.post(f'{API_URL}/util/email', headers=dict(headers, **{'validate_me': getenv('VALIDATE_ME')}), json=payload, verify=False)
-
-        try: return res.json()
-        except: return res.content
-
-    except:
-        pass
+    except Exception as e:
+        logging.error(f'ERR:{myself()}: cannot display discord msg ({e})')
         
     return {'status': 'emailed', 'message': 'failed to send email'}
+
+@celery.task(name='validate_height', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
+async def validate_height(self):
+    try:
+        await height()
+
+    except Exception as e:
+        logging.error(f'{myself()}: {e}')
+        alertAdmin(f'FAIL: {myself()}', f'staking.snapshot\nerr: {e}')
+        self.retry(exc=e)
 
 # celery call "snapshot_staking"
 @celery.task(name='snapshot_staking', bind=True, default_retry_delay=300, max_retries=2, retry_backoff=True)
@@ -141,22 +148,26 @@ def compound_staking(self):
     try:      
         remainingBoxes = 1
         i = 0
-        while remainingBoxes > 0 or (i >= 5):
-            res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
-            if res.ok:
-                if res.json():
-                    try:
-                        remainingBoxes = int(res.json()['remainingBoxes'])
-                        compoundTx = res.json()['compoundTx']
-                        logging.debug(f'compoundTx: {compoundTx}')
-                    except:
-                        return {'res': res.text}
-            elif 'Too early for a new emission' in res.text:
-                return {'status': 'complete', 'message': 'too early'}
-            else:
-                alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
-                raise TaskFailure(res.text)
-            i += 1
+        while remainingBoxes > 0 and (i < 5):
+            try:
+                res = requests.post(f'{API_URL}/staking/compound', headers=headers, json=stakingBody, verify=False)
+                if res.ok:
+                    if res.json():
+                        try:
+                            remainingBoxes = int(res.json()['remainingBoxes'])
+                            compoundTx = res.json()['compoundTx']
+                            logging.debug(f'compoundTx: {compoundTx}')
+                        except:
+                            return {'res': res.text}
+                elif 'Too early for a new emission' in res.text:
+                    return {'status': 'complete', 'message': 'too early'}
+                else:
+                    alertAdmin(f'FAIL: {myself()}', f'staking.compound\nremainingStakers > 0 after 5 attempts ({API_URL}/staking/compound)')
+                    raise TaskFailure(res.text)
+                i += 1
+            except:
+                logging.error(f'{myself()}: error calling /staking/compound from tasks, stopping\n{e}')
+                i = 5
 
         try: msg = res.json() 
         except: msg = res.text
