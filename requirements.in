@@ -10,3 +10,7 @@ uvicorn
 flower
 ccxt
 discord.py
+sqlmodel
+aiohttp 
+aiodns
+aiohttp

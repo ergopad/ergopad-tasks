@@ -13,6 +13,12 @@ celery.conf.beat_sync_every = 1
 celery.conf.beat_schedule = {
 
     # staking emmission daily
+    'height_validator_3m': {
+        'task': 'validate_height',
+        'schedule': crontab(minute='*/3'),
+    },
+
+    # staking emmission daily
     'emit_staking_1h': {
         'task': 'emit_staking',
         'schedule': crontab(minute='0'),
