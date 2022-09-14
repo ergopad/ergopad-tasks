@@ -10,15 +10,8 @@ services:
     volumes: 
       - ./app:/app
     networks:
-      - ergopad-data_net
-      - ergopad-node_net
       - ergopad-net
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 5
-        window: 90s
+    restart: unless-stopped
     logging:
         driver: "json-file"
         options:
@@ -36,14 +29,8 @@ services:
     volumes:
       - ./app:/app
     networks: 
-      - ergopad-data_net
       - ergopad-net
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 5
-        window: 90s
+    restart: unless-stopped
     logging:
         driver: "json-file"
         options:
@@ -60,14 +47,8 @@ services:
       - /backups/pgmaint:/backups
       - ./periodic/daily:/etc/periodic/daily/:ro
     networks: 
-      - ergopad-data_net
       - ergopad-net
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 5
-        window: 90s
+    restart: unless-stopped
     logging:
         driver: "json-file"
         options:
@@ -80,6 +61,7 @@ services:
   celeryui:
     container_name: celeryui
     env_file: ${ENV_FILE}
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -88,18 +70,11 @@ services:
     volumes: 
       - ./app:/app
     networks: 
-      - ergopad-data_net
       - ergopad-net
     profiles: 
       - disabled
     command: uvicorn main:app --host 0.0.0.0 --reload
 
 networks:
-  ergopad-data_net:
-    external: true
-  ergopad-node_net:
-    external: true
-  ergopad-api_net:
-    external: true
   ergopad-net:
     external: true
