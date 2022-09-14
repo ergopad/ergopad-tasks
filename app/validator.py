@@ -66,7 +66,7 @@ def create_beans():
     beans = {
         'alpha': ErgoBeans(name='alpha node', url='http://54.214.59.165:9053/info', type='ergonode'),
         'beta': ErgoBeans(name='beta node', url='http://52.12.102.149:9053/info', type='ergonode'),
-        'winter': ErgoBeans(name='winter node', url='http://10.0.0.134:9053/info', type='ergonode'),
+        'winter': ErgoBeans(name='winter node', url='http://node:9053/info', type='ergonode'),
         'alpha_xpl': ErgoBeans(name='alpha explorer', url='http://54.214.59.165:9090/api/v1/networkState', type='explorer'),
         'beta_xpl': ErgoBeans(name='beta explorer', url='http://52.12.102.149:9090/api/v1/networkState', type='explorer'),
         'public_xpl': ErgoBeans(name='public explorer', url='http://api.ergoplatform.com/api/v1/networkState', type='explorer'),
